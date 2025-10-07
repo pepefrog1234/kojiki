@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import argparse
+
+import base64
+import mimetypes
 import os
 from glob import glob
 from pathlib import Path
@@ -72,19 +75,26 @@ def guess_output_filename(image_path: Path) -> str:
 
 
 def call_ocr(client: OpenAI, model: str, image_path: Path) -> str:
-    with image_path.open("rb") as image_file:
-        response = client.responses.create(
-            model=model,
-            input=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": PROMPT},
-                        {"type": "input_image", "image": image_file},
-                    ],
-                }
-            ],
-        )
+    image_bytes = image_path.read_bytes()
+    image_b64 = base64.b64encode(image_bytes).decode("ascii")
+    mime_type, _ = mimetypes.guess_type(image_path.name)
+    image_payload = {
+        "data": image_b64,
+        "mime_type": mime_type or "application/octet-stream",
+    }
+
+    response = client.responses.create(
+        model=model,
+        input=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": PROMPT},
+                    {"type": "input_image", "image": image_payload},
+                ],
+            }
+        ],
+    )
     return response_to_text(response)
 
 
